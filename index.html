@@ -103,7 +103,7 @@
 
                     connection.emit('init', id);
 
-                    // this event will be fired when bc:broadcast will be emited in other browsers
+                    // this event will be fired when b:broadcast will be emited in other browsers
                     connection.on('broadcast', id => {
 
                         log('broadcast', id)
@@ -129,7 +129,11 @@
         }
         onBroadcast = () => {
 
-            connection.emit('bc:broadcast', id)
+            connection.emit('b:broadcast', id)
+        }
+        onAll = () => {
+
+            connection.emit('a:broadcast', id)
         }
         render() {
 
@@ -150,6 +154,8 @@
                                 <fieldset>
                                     <legend>Broadcast</legend>
                                     <button onClick={this.onBroadcast}>broadcast</button>
+                                    <br />
+                                    <button onClick={this.onAll}>all</button>
                                     <br />
                                     To test broadcasting from browsers to other connected browsers, open in different browsers links like:
                                     <br />

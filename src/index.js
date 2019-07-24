@@ -35,15 +35,23 @@ module.exports = (opt = {}) => {
 
             let [name, value] = data;
 
-            if ( typeof name === 'string' && name.indexOf('bc:') === 0 ) {
+            if ( typeof name === 'string' && /^[ab]:/.test(name) ) {
 
                 name = name.split(':');
 
-                name.shift();
+                const mode = name.shift();
 
                 name = name.join(':');
 
-                socket.broadcast.emit(name, value);
+                if (mode === 'b') {
+
+                    return socket.broadcast.emit(name, value);
+                }
+
+                if (mode === 'a') {
+
+                    return io.emit(name, value);
+                }
             }
         });
 
