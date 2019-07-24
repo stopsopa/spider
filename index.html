@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <script src="node_modules/react/umd/react.production.min.js"></script>
+    <script src="node_modules/react-dom/umd/react-dom.production.min.js"></script>
+    <script src="node_modules/@babel/standalone/babel.min.js"></script>
+    <script src="node_modules/socket.io-client/dist/socket.io.js"></script>
+    <!--
+        yarn add @babel/standalone
+        homepage github repo:
+            https://github.com/babel/babel-standalone
+        from cdn:
+            https://reactjs.org/docs/add-react-to-a-website.html#quickly-try-jsx
+    -->
+    <script>window.React || document.write("run server using 'make start' it will link node_modules where it should be");</script>
+</head>
+<body>
+<div id="app">
+    Loading ...
+</div>
+<script type="text/babel">
+
+    const log=(function(){try{return console.log}catch(e){return function(){}}}());
+
+    const delay = (time, data) =>
+        new Promise(
+            resolve => time ? setTimeout(resolve, time, data) : resolve(data)
+        )
+    ;
+
+    const connection        =   io();
+
+    var query = (location.search || '?').substring(1).split('&').filter(a => a).reduce((acc, val) => {
+
+        var
+            a       = val.split(/=/),
+            key     = a.shift(),
+            v       = decodeURIComponent(a.join('='))
+        ;
+
+        if (Array.isArray(acc[key])) {
+            acc[key].push(v);
+        }
+        else {
+            if (typeof acc[key] === 'string') {
+                acc[key] = [acc[key]];
+                acc[key].push(v)
+            }
+            else {
+                acc[key] = v;
+            }
+        }
+
+        return acc;
+    }, {});
+
+    const id = query.id || 'undefined';
+
+    class Root extends React.Component {
+        constructor(...args) {
+
+            super(...args);
+
+            this.state = {
+                list: [],
+                recuring: [],
+            }
+        }
+        onMount = () => {
+
+            log('onMount');
+
+            if ( ! this.connect ) {
+
+                this.connect = () => {
+
+                    // to prevent firing twice after reconnecting
+                    connection.removeEventListener('connect', this.connect);
+
+                    log('connected');
+
+                    // server sends this event all the time each second
+                    connection.on('recuring', time => this.setState(({recuring}) => {
+
+                        recuring = [...recuring];
+
+                        recuring.unshift(time);
+
+                        while (recuring.length > 10) {
+
+                            recuring.pop();
+                        }
+
+                        return {
+                            recuring,
+                        }
+                    }))
+
+                    connection.emit('init', id);
+
+                    // this event will be fired when bc:broadcast will be emited in other browsers
+                    connection.on('broadcast', id => {
+
+                        log('broadcast', id)
+
+                        this.setState(({list}) => {
+
+                            list = [...list];
+
+                            list.push(id);
+
+                            return {
+                                list,
+                            }
+                        })
+                    })
+                };
+            }
+
+            connection.on('connect', this.connect);
+        }
+        componentDidMount() {
+            this.onMount();
+        }
+        onBroadcast = () => {
+
+            connection.emit('bc:broadcast', id)
+        }
+        render() {
+
+            const {
+                list,
+                recuring,
+            } = this.state;
+
+            return (
+                <>
+                    <div>It's working...</div>
+                    <table>
+                        <tbody>
+                        <tr>
+                            <td valign="top">
+                                <pre>{JSON.stringify(list, null, 4)}</pre>
+                                <br />
+                                <fieldset>
+                                    <legend>Broadcast</legend>
+                                    <button onClick={this.onBroadcast}>broadcast</button>
+                                    <br />
+                                    To test broadcasting from browsers to other connected browsers, open in different browsers links like:
+                                    <br />
+                                    <a href="/index.html?id=chrome">/index.html?id=chrome</a>
+                                    <br />
+                                    <a href="/index.html?id=opera">/index.html?id=opera</a>
+                                    <br />
+                                    <a href="/index.html?id=safari">/index.html?id=safari</a>
+                                    <br />
+                                    and try to click broadcast button in each of them
+                                </fieldset>
+                                <br />
+                                <button onClick={this.onMount}>remount</button>
+                            </td>
+                            <td valign="top">
+                                <pre>{JSON.stringify(recuring, null, 4)}</pre>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </>
+            );
+        }
+    }
+    ReactDOM.render(
+        <Root
+        />,
+        document.getElementById('app')
+    );
+</script>
+</body>
+</html>
