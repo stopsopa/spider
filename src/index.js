@@ -110,13 +110,15 @@ module.exports = (opt = {}) => {
                     domain = url;
                 }
 
+                domain = domain.replace(/^(https?:\/\/[^\/]+)\/.*$/i, '$1');
+
                 domain = trim(domain, '/', 'r');
 
                 const mainurl = url || domain;
 
                 if ( ! /https?:\/\/[^\/]+/.test(domain) ) {
 
-                    throw new Error(`Given domain is not valid...`);
+                    throw new Error(`Given domain '${domain}' is not valid...`);
                 }
 
                 let list = await mnodes.findUrlsToCheck(hash, domain);
@@ -169,7 +171,7 @@ module.exports = (opt = {}) => {
 
                                             if ( last ) {
 
-                                                extra.json = data.json;
+                                                extra.json = data.json || null;
                                             }
 
                                             const to    = await mnodes.ensureExist(trx, one[1], extra);
@@ -191,7 +193,7 @@ module.exports = (opt = {}) => {
 
                                         await mnodes.update(trx, {
                                             status  : data.status,
-                                            json    : data,
+                                            json    : data || null,
                                         }, from);
 
                                         batch.push({
