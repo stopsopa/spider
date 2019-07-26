@@ -1,21 +1,31 @@
 
-const path = require('path');
+require('dotenv-up')({
+    override    : false,
+    deep        : 3,
+}, true, 'server.js');
 
-const express = require('express');
+const path                  = require('path');
 
-const host = '0.0.0.0';
+const log                   = require('inspc');
 
-const port = '4455'
+const express               = require('express');
 
-const log = require('inspc');
+const host                  = process.env.NODE_HOST;
 
-const app = express();
+const port                  = process.env.NODE_PORT;
+
+const app                   = express();
 
 const server    = require('http').createServer(app);
 
 const io        = require('socket.io')(server); // io
 
+// https://stackoverflow.com/a/37159364/5560682
 io.use(require('socketio-wildcard')());
+
+const knex              = require('knex-abstract');
+
+knex.init(require(path.resolve(__dirname, 'app', 'models', 'config')));
 
 app.use(express.static(path.resolve(__dirname, '.')));
 
@@ -33,15 +43,12 @@ app.use(require('./src')({
     io
 }));
 
-app.all('/test', (req, res) => res.end('test...'));
-
 // for sockets
 server.listen( // ... we have to listen on server
     port,
     host,
     undefined, // io -- this extra parameter
     () => {
-
         console.log(`\n 🌎  Server is running ` + ` ${host}:${port} ` + "\n")
     }
 );

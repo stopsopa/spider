@@ -5,186 +5,446 @@
     <meta name="viewport"
           content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Document</title>
+    <link rel="stylesheet" href="node_modules/normalize-css/normalize.css">
+    <title>Spider</title>
+    <style>
+        body {
+            /*margin: 10px;*/
+        }
+        #app {
+            /*height: calc(100vh - 20px);*/
+            height: calc(100vh);
+            background-color: lightgreen;
+            display: flex;
+            flex-direction: column;
+        }
+        #app > .graph {
+            position: relative;
+            flex-grow: 1;
+        }
+        #app > .graph > .canvas {
+            /*height: 100%;*/
+        }
+        .info {
+            z-index: 100;
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            background-color: #f5f4f4;
+            border: 1px solid #434343;
+            max-width: 30%;
+            max-height: 80%;
+        }
+        .info > div {
+            position: relative;
+            min-width: 40px;
+        }
+        .info > div > div.ex {
+            position: absolute;
+            top: -1px;
+            right: -16px;
+            border: 1px solid #464646;
+            background-color: #ececec;
+            cursor: pointer;
+        }
+        .info > div > div.ex:hover {
+            background-color: #dcdcdc;
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+    <script type="text/babel">
+
+        /**
+         * Options:
+         *  https://visjs.github.io/vis-network/docs/network/#options
+         *  performance:
+         *      https://datastorm-open.github.io/visNetwork/performance.html
+         *
+         * All examples:
+         *      https://visjs.github.io/vis-network/examples/
+         *
+         * https://ww3.arb.ca.gov/ei/tools/lib/vis/docs/dataset.html#Data_Manipulation
+         *      DataSet manipulation
+         *
+         * https://visjs.github.io/vis-network/examples/network/other/animationShowcase.html
+         *      fit trigger
+         *      focus on random node
+         * https://visjs.github.io/vis-network/examples/network/events/interactionEvents.html
+         *      hover event
+         * https://visjs.github.io/vis-network/examples/network/data/datasets.html
+         *      reload new set of nodes
+         * https://visjs.github.io/vis-network/examples/network/data/dynamicData.html
+         *      adding dynamically nodes
+         * https://visjs.github.io/vis-network/examples/network/data/scalingCustom.html
+         *      scaling nodes with values
+         * https://visjs.github.io/vis-network/examples/network/other/configuration.html
+         *      dynamic configuration
+         *
+         * https://visjs.github.io/vis-network/examples/network/physics/physicsConfiguration.html
+         *      selecting element
+         *      physic configurator
+         *
+         * https://visjs.github.io/vis-network/examples/network/other/chosen.html
+         *      typ linii
+         * @type {*|undefined}
+         */
+
+        const log=(function(){try{return console.log}catch(e){return function(){}}}());
+
+        const delay = (time, data) =>
+            new Promise(
+                resolve => time ? setTimeout(resolve, time, data) : resolve(data)
+            )
+        ;
+
+        const connection        =   io();
+
+        var query = (location.search || '?').substring(1).split('&').filter(a => a).reduce((acc, val) => {
+
+            var
+                a       = val.split(/=/),
+                key     = a.shift(),
+                v       = decodeURIComponent(a.join('='))
+            ;
+
+            if (Array.isArray(acc[key])) {
+                acc[key].push(v);
+            }
+            else {
+                if (typeof acc[key] === 'string') {
+                    acc[key] = [acc[key]];
+                    acc[key].push(v)
+                }
+                else {
+                    acc[key] = v;
+                }
+            }
+
+            return acc;
+        }, {});
+
+        const id = query.id || 'undefined';
+
+        class Root extends React.Component {
+            constructor(...args) {
+
+                super(...args);
+
+                this.state = {
+                    list: [],
+                    recuring: [],
+                    url: '',
+                    hash: false, // can be false, true - means request for hash is already sent, string - hash arrived and script is running
+                }
+            }
+            onMount = () => {
+
+                log('onMount');
+
+                if ( ! this.connect ) {
+
+                    this.connect = () => {
+
+                        // to prevent firing twice after reconnecting
+                        connection.removeEventListener('connect', this.connect);
+
+                        log('connected');
+
+                        // server sends this event all the time each second
+                        connection.on('recuring', time => this.setState(({recuring}) => {
+
+                            recuring = [...recuring];
+
+                            recuring.unshift(time);
+
+                            while (recuring.length > 10) {
+
+                                recuring.pop();
+                            }
+
+                            return {
+                                recuring,
+                            }
+                        }))
+
+                        connection.emit('init', id);
+
+                        // this event will be fired when b:broadcast will be emited in other browsers
+                        connection.on('broadcast', id => {
+
+                            log('broadcast', id)
+
+                            this.setState(({list}) => {
+
+                                list = [...list];
+
+                                list.push(id);
+
+                                return {
+                                    list,
+                                }
+                            })
+                        });
+
+                        connection.on('sethash', hash => this.setState({hash}, () => {
+
+                            this.n.e.forEach(r => {
+
+                                const c = {...r};
+
+                                c.color = {...r.color};
+
+                                c.color.color = '#a7a7a7';
+
+                                c.dashes = true;
+
+                                this.n.e.update(c);
+                            });
+
+                            this.n.n.forEach(r => {
+
+                                const c = {...r};
+
+                                c.color = '#efefef';
+
+                                c.font = {color: '#a7a7a7'}
+
+                                this.n.n.update(c);
+                            });
+
+                            const {
+                                hash,
+                                url,
+                            } = this.state;
+
+                            connection.emit('start', {
+                                hash,
+                                url,
+                            })
+                        }));
+
+                        connection.on('batch', batch => {
+
+                            (batch || []).forEach(n => {
+
+                                const t = this.n[n.target];
+
+                                if (t.get(n.data.id)) {
+                                    t.update(n.data);
+                                }
+                                else {
+                                    t.add([n.data])
+                                }
+                            })
+                        });
+
+                        connection.on('setstate', data => this.setState(data));
+                    };
+                }
+
+                connection.on('connect', this.connect);
+            }
+            componentDidMount() {
+
+                this.onMount();
+
+                // create an array with nodes
+                var nodes = new vis.DataSet([
+                    // {id: 1, label: 'Node 1', color: '#a60000'},
+                    // {id: 2, label: 'Node 2', color: '#00621c'},
+                    // {id: 3, label: 'Node 3'},
+                    // {id: 4, label: 'Node 4'},
+                    // {id: 5, label: 'Node 5'}
+                ]);
+
+                // create an array with edges
+                var edges = new vis.DataSet([
+                    // {from: 1, to: 3},
+                    // {from: 1, to: 2},
+                    // {from: 2, to: 4},
+                    // {from: 2, to: 5}
+                ]);
+
+                // create a network
+                var container = document.querySelector('.canvas');
+
+                // provide the data in the vis format
+                var data = {
+                    nodes: nodes,
+                    edges: edges
+                };
+                var options = {
+                    interaction:{hover:true},
+                    layout:{randomSeed:2},
+                    // edges: {
+                    //     smooth: false,
+                    // },
+                    // "physics": {
+                    //     "repulsion": {
+                    //         "centralGravity": 0,
+                    //         "springLength": 500,
+                    //         "springConstant": 0,
+                    //         "nodeDistance": 320
+                    //     },
+                    //     "maxVelocity": 180,
+                    //     "minVelocity": 3.19,
+                    //     "solver": "repulsion",
+                    //     "timestep": 0.01
+                    // },
+                    // "physics": {
+                    //     "barnesHut": {
+                    //         "centralGravity": 0,
+                    //         "springLength": 500,
+                    //         "springConstant": 0.65,
+                    //         "damping": 0.67
+                    //     },
+                    //     "minVelocity": 0.75,
+                    //     solver: 'barnesHut', // solver: 'barnesHut',
+                    // },
+                    // "physics": {
+
+                    //     "barnesHut": {
+                    //         "gravitationalConstant": -30000,
+                    //         "centralGravity": 0,
+                    //         "springLength": 575
+                    //     },
+                    //     "maxVelocity": 169,
+                    //     "minVelocity": 1.79,
+                    //     "timestep": 0.01
+                    // }
+                };
+
+
+                // initialize your network!
+                var network = new vis.Network(container, data, options);
+
+                network.n = nodes;
+
+                network.e = edges;
+
+                this.n = window.n = network;
+
+                network.on("hoverNode", function (params) {
+                    console.log('hoverNode Event:', params);
+                });
+                // network.on("oncontext", function (params) {
+                //     log(JSON.stringify(params, null, 4))
+                // });
+                network.on("select", function (params) {
+                    console.log('select Event:', params);
+                });
+
+                setTimeout(() => {
+                    document.querySelector('.canvas').style.height = document.querySelector('.graph').clientHeight + 'px'
+
+                    setTimeout(() => {
+                        network.fit({
+                            animation: {             // animation object, can also be Boolean
+                                duration: 1000,                 // animation duration in milliseconds (Number)
+                                easingFunction: "easeInOutQuad" // Animation easing function, available are:
+                            }
+                        });
+                    }, 1000)
+                }, 1000)
+            }
+            onFit = () => {
+
+                if ( ! this.n ) { return; }
+
+                this.n.fit();
+            }
+            onLoad = (offset = 0) => {
+
+                if ( ! this.n ) { return; }
+
+                const {
+                    url,
+                    hash,
+                } = this.state;
+
+                connection.emit('load', {
+                    url,
+                    hash,
+                    offset,
+                });
+            }
+            onStart = () => {
+
+                if ( ! this.n ) { return; }
+
+                const {
+                    hash,
+                } = this.state;
+
+                this.setState({
+                    hash: true,
+                }, () => {
+
+                    const {
+                        hash,
+                    } = this.state;
+
+                    if (hash === true) {
+
+                        connection.emit('gethash');
+                    }
+                });
+            }
+            // onBroadcast = () => {
+            //
+            //     connection.emit('b:broadcast', id)
+            // }
+            // onAll = () => {
+            //
+            //     connection.emit('a:broadcast', id)
+            // }
+            render() {
+
+                const {
+                    list,
+                    recuring,
+                    url,
+                    hash,
+                } = this.state;
+
+                return (
+                    <>
+                        <div className="top">
+                            <button onClick={this.onFit}>fit</button>
+                            <button>go</button>
+                            <input type="text" placeholder="http://..."
+                                   onChange={e => this.setState({url: e.target.value})}
+                                   value={url}
+                            />
+                            <button onClick={() => this.onLoad(-1)}>&lt;</button>
+                            <button onClick={() => this.onLoad()}>load</button>
+                            <button onClick={() => this.onLoad(1)}>&gt;</button>
+                            <button onClick={this.onStart}>start</button>
+                        </div>
+                        <div className="graph">
+                            <div className="info">
+                                <div>
+                                    <div className="ex">X</div>
+                                    Loading...
+                                </div>
+                            </div>
+                            <div className="canvas"></div>
+                        </div>
+                    </>
+                );
+            }
+        }
+        ReactDOM.render(
+            <Root />,
+            document.getElementById('app')
+        );
+    </script>
+    <script src="node_modules/vis/dist/vis.js"></script>
     <script src="node_modules/react/umd/react.production.min.js"></script>
     <script src="node_modules/react-dom/umd/react-dom.production.min.js"></script>
     <script src="node_modules/@babel/standalone/babel.min.js"></script>
     <script src="node_modules/socket.io-client/dist/socket.io.js"></script>
-    <!--
-        yarn add @babel/standalone
-        homepage github repo:
-            https://github.com/babel/babel-standalone
-        from cdn:
-            https://reactjs.org/docs/add-react-to-a-website.html#quickly-try-jsx
-    -->
-    <script>window.React || document.write("run server using 'make start' it will link node_modules where it should be");</script>
-</head>
-<body>
-<div id="app">
-    Loading ...
-</div>
-<script type="text/babel">
-
-    const log=(function(){try{return console.log}catch(e){return function(){}}}());
-
-    const delay = (time, data) =>
-        new Promise(
-            resolve => time ? setTimeout(resolve, time, data) : resolve(data)
-        )
-    ;
-
-    const connection        =   io();
-
-    var query = (location.search || '?').substring(1).split('&').filter(a => a).reduce((acc, val) => {
-
-        var
-            a       = val.split(/=/),
-            key     = a.shift(),
-            v       = decodeURIComponent(a.join('='))
-        ;
-
-        if (Array.isArray(acc[key])) {
-            acc[key].push(v);
-        }
-        else {
-            if (typeof acc[key] === 'string') {
-                acc[key] = [acc[key]];
-                acc[key].push(v)
-            }
-            else {
-                acc[key] = v;
-            }
-        }
-
-        return acc;
-    }, {});
-
-    const id = query.id || 'undefined';
-
-    class Root extends React.Component {
-        constructor(...args) {
-
-            super(...args);
-
-            this.state = {
-                list: [],
-                recuring: [],
-            }
-        }
-        onMount = () => {
-
-            log('onMount');
-
-            if ( ! this.connect ) {
-
-                this.connect = () => {
-
-                    // to prevent firing twice after reconnecting
-                    connection.removeEventListener('connect', this.connect);
-
-                    log('connected');
-
-                    // server sends this event all the time each second
-                    connection.on('recuring', time => this.setState(({recuring}) => {
-
-                        recuring = [...recuring];
-
-                        recuring.unshift(time);
-
-                        while (recuring.length > 10) {
-
-                            recuring.pop();
-                        }
-
-                        return {
-                            recuring,
-                        }
-                    }))
-
-                    connection.emit('init', id);
-
-                    // this event will be fired when b:broadcast will be emited in other browsers
-                    connection.on('broadcast', id => {
-
-                        log('broadcast', id)
-
-                        this.setState(({list}) => {
-
-                            list = [...list];
-
-                            list.push(id);
-
-                            return {
-                                list,
-                            }
-                        })
-                    })
-                };
-            }
-
-            connection.on('connect', this.connect);
-        }
-        componentDidMount() {
-            this.onMount();
-        }
-        onBroadcast = () => {
-
-            connection.emit('b:broadcast', id)
-        }
-        onAll = () => {
-
-            connection.emit('a:broadcast', id)
-        }
-        render() {
-
-            const {
-                list,
-                recuring,
-            } = this.state;
-
-            return (
-                <>
-                    <div>It's working...</div>
-                    <table>
-                        <tbody>
-                        <tr>
-                            <td valign="top">
-                                <pre>{JSON.stringify(list, null, 4)}</pre>
-                                <br />
-                                <fieldset>
-                                    <legend>Broadcast</legend>
-                                    <button onClick={this.onBroadcast}>broadcast</button>
-                                    <br />
-                                    <button onClick={this.onAll}>all</button>
-                                    <br />
-                                    To test broadcasting from browsers to other connected browsers, open in different browsers links like:
-                                    <br />
-                                    <a href="/index.html?id=chrome">/index.html?id=chrome</a>
-                                    <br />
-                                    <a href="/index.html?id=opera">/index.html?id=opera</a>
-                                    <br />
-                                    <a href="/index.html?id=safari">/index.html?id=safari</a>
-                                    <br />
-                                    and try to click broadcast button in each of them
-                                </fieldset>
-                                <br />
-                                <button onClick={this.onMount}>remount</button>
-                            </td>
-                            <td valign="top">
-                                <pre>{JSON.stringify(recuring, null, 4)}</pre>
-                            </td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </>
-            );
-        }
-    }
-    ReactDOM.render(
-        <Root
-        />,
-        document.getElementById('app')
-    );
-</script>
 </body>
 </html>

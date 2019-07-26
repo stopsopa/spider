@@ -1,0 +1,14 @@
+version: '3.1'
+
+services:
+    mysql:
+        image: mysql/mysql-server:5.7
+        ports:
+            - "1162:3306"
+        environment:
+            - MYSQL_ROOT_PASSWORD=docker_super_secret_passwd
+            - MYSQL_ROOT_HOST=%
+        #networks:
+        #    - code-network
+        volumes:
+            - ./mysql:/var/lib/mysql
