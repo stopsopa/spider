@@ -181,11 +181,14 @@ module.exports = (opt = {}) => {
                                                 node    : to,
                                             });
 
-                                            const eid   = await medges.ensureExist(trx, prev, to, one[0]);
+                                            if (prev !== to) {
 
-                                            await mlogs.ensureExist(trx, runid, {
-                                                edge    : eid,
-                                            });
+                                                const eid   = await medges.ensureExist(trx, prev, to, one[0]);
+
+                                                await mlogs.ensureExist(trx, runid, {
+                                                    edge    : eid,
+                                                });
+                                            }
 
                                             prev = to;
                                         }
@@ -204,35 +207,46 @@ module.exports = (opt = {}) => {
                                             }
                                         });
 
-                                        await mlogs.ensureExist(trx, runid, {
-                                            node    : from,
-                                        });
+                                        if ( isInTheSameOrigin(url, domain) ) {
 
-                                        for (let link of data.foundlinks) {
+                                            for (let link of data.foundlinks) {
 
-                                            const nid   = await mnodes.ensureExist(trx, domain + link);
+                                                if ( ! /https?:\/\//g.test(link) ) {
 
-                                            batch.push({
-                                                target: 'n',
-                                                data: {
-                                                    id: nid,
+                                                    link = domain + link;
                                                 }
-                                            });
 
-                                            const eid   = await medges.ensureExist(trx, from, nid);
+                                                const extra = {};
 
-                                            batch.push({
-                                                target: 'e',
-                                                data: {
-                                                    id: eid,
-                                                    from,
-                                                    to: nid
+                                                if ( ! isInTheSameOrigin(url, link) ) {
+
+                                                    extra.origin = domain;
                                                 }
-                                            });
 
-                                            await mlogs.ensureExist(trx, runid, {
-                                                edge    : eid,
-                                            });
+                                                const nid   = await mnodes.ensureExist(trx, link, extra);
+
+                                                batch.push({
+                                                    target: 'n',
+                                                    data: {
+                                                        id: nid,
+                                                    }
+                                                });
+
+                                                const eid   = await medges.ensureExist(trx, from, nid);
+
+                                                batch.push({
+                                                    target: 'e',
+                                                    data: {
+                                                        id: eid,
+                                                        from,
+                                                        to: nid
+                                                    }
+                                                });
+
+                                                await mlogs.ensureExist(trx, runid, {
+                                                    edge    : eid,
+                                                });
+                                            }
                                         }
                                     }
 
@@ -249,6 +263,11 @@ module.exports = (opt = {}) => {
                                     url,
                                     parsing_error: e
                                 }, 3);
+
+                                await mnodes.update({
+                                    status  : 0,
+                                    json    : String(e),
+                                }, from);
 
                                 await mlogs.ensureExist(runid, {
                                     node    : from,
@@ -495,6 +514,33 @@ ORDER BY              r.created DESC
         }
 
         return res.json(json);
+    });
+
+    /**
+     * fetch('/any/thing?redirect=' + encodeURIComponent('/red1'))
+     */
+    router.use((req, res, next) => {
+
+        let redirect = req.query.redirect;
+
+        if ( typeof redirect === 'string' ) {
+
+            log.dump({
+                redirect,
+                protocol        : req.protocol,
+                host            : req.get('host'),
+                reconstrucred   : req.protocol + '://' + req.get('host') + redirect,
+            }, 4)
+
+            if ( ! /^https?:\/\//i.test(redirect) ) {
+
+                redirect = req.protocol + '://' + req.get('host') + redirect;
+            }
+
+            return res.redirect(redirect);
+        }
+
+        next();
     });
 
     router.all('/red1', (req, res) => {

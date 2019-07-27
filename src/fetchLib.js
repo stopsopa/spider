@@ -184,8 +184,6 @@ function extractLinks(originalurl, html) {
 
     reg.lastIndex = 0;
 
-    let reset = 10;
-
     let tmp;
 
     do {
@@ -193,13 +191,6 @@ function extractLinks(originalurl, html) {
         tmp = reg.exec(html);
 
         if (tmp) {
-
-            if (reset) {
-
-                reset -= 1;
-
-                reg.lastIndex = 0;
-            }
 
             list.push(tmp[2]);
         }
@@ -222,7 +213,7 @@ function extractLinks(originalurl, html) {
         }
 
         if (h[0] === '?') {
-            links.push(location.pathname + h);
+            links.push(path.normalize(location.pathname + h));
             continue;
         }
 
@@ -244,6 +235,9 @@ function extractLinks(originalurl, html) {
 
         if (h[0] === '/') {
             if (h[1] && h[1] === '/') {
+
+                                links.push(location.protocol + '/' + path.normalize(h));
+
                 continue;
             }
             links.push(h);
@@ -255,15 +249,18 @@ function extractLinks(originalurl, html) {
             continue;
         }
 
-        if ( ! /^https?:\/\//i.test(h) && h[0] !== '/' ) {
-            links.push(pathname + '/' + h);
+        // if ( ! /^https?:\/\//i.test(h) && h[0] !== '/' ) {
+        //     links.push(pathname + '/' + h);
+        // }
+
+        if ( /^https?:\/\//i.test(h) ) {
+
+            links.push(h);
         }
     }
 
     // unique
     links = links.reduce((acc, link) => {
-
-        link = path.normalize(link);
 
         acc[link] = link;
 

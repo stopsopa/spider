@@ -58,12 +58,18 @@ module.exports = knex => extend(knex, prototype, {
             url,
         });
     },
-    findUrlsToCheck: async function (hash, domain) {
+    findUrlsToCheck: async function (...args) {
 
-        const list = await this.query(`
+        let [debug, trx, hash, domain] = a(args);
+
+        const list = await this.query(debug, trx, `
 SELECT        n.url
 FROM          nodes n 
-WHERE         n.url LIKE :prefix
+WHERE         (
+    n.url LIKE :prefix
+    or 
+    n.origin = :origin
+)
           AND n.url NOT IN (
                 SELECT              n.url
                 FROM                nodes n 
@@ -71,11 +77,15 @@ WHERE         n.url LIKE :prefix
                                  ON n.id = l.node
                          INNER JOIN run r
                                  ON r.id = l.run
-                WHERE               n.url LIKE :prefix
+                WHERE               (
+                                        n.url LIKE :prefix
+                                     or n.origin = :origin
+                                    )
                                 AND r.hash = :hash
 )
 `, {
             prefix: domain + '%',
+            origin: domain,
             hash,
         });
 
@@ -102,7 +112,7 @@ WHERE         n.url LIKE :prefix
             row.hash = sha1(row.url);
         }
 
-        if ( typeof row.json !== 'undefined' && typeof row.json !== 'string' ) {
+        if ( typeof row.json !== 'undefined' && typeof row.json !== 'string' && row.json !== null ) {
 
             row.json = JSON.stringify(row.json, null, 4);
         }
