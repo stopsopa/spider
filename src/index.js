@@ -397,6 +397,10 @@ ORDER BY              r.created DESC
 
             res.statusCode = 500;
 
+            log.dump({
+                '/router error: ': e,
+            }, 3)
+
             return res.json({
                 error: String(e)
             });

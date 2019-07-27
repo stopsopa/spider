@@ -28,7 +28,7 @@ function request (url, timeout = 30000, internal) {
 
         const uri   = new URL(url);
 
-        const lib   = (uri.protocol.indexOf('https://') === 0) ? https : http;
+        const lib   = (uri.protocol === 'https:') ? https : http;
 
         const get = {};
 
@@ -46,16 +46,18 @@ function request (url, timeout = 30000, internal) {
         //     },
         // })
 
-        var req = lib.request({
+        const rq = {
             hostname    : uri.hostname,
-            port        : uri.port || '80',
+            port        : uri.port || ( (uri.protocol === 'https:') ? '443' : '80'),
             path        : uri.pathname + uri.search + (query ? (uri.search.includes('?') ? '&' : '?') + query : ''),
             // method      : 'POST',
             headers     : {
                 // 'Content-Type': 'application/json; charset=utf-8',
                 Accept: `text/html; charset=utf-8`,
             },
-        }, res => {
+        };
+
+        var req = lib.request(rq, res => {
 
             const isHtml = (res.headers['content-type'] || '').toLowerCase().indexOf('text/html') === 0;
 
@@ -71,6 +73,15 @@ function request (url, timeout = 30000, internal) {
                 });
 
                 res.on('end', () => {
+
+                    // log.dump({
+                    //     status: res.statusCode,
+                    //     headers: res.headers,
+                    //     isHtml,
+                    //     uri,
+                    //     body,
+                    //     rq,
+                    // }, 5)
 
                     resolve({
                         status: res.statusCode,
