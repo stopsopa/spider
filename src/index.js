@@ -15,6 +15,7 @@ const { wait }          = require('nlab/delay');
 const trim              = require('nlab/trim');
 
 const fetchLib          = require('./fetchLib');
+// const fetchLib          = require('./fetchLib-abandoned');
 
 const isInTheSameOrigin = fetchLib.isInTheSameOrigin;
 
@@ -260,14 +261,6 @@ module.exports = (opt = {}) => {
                     }
 
                 } while (list.length);
-
-                log.dump({
-                    end: true,
-                    hash,
-                    url,
-                    list,
-                    domain,
-                }, 4);
             }
             catch (e) {
 
@@ -326,16 +319,6 @@ ORDER BY              r.created DESC
                 `;
 
                 const hashes = await mrun.query(true, query, params);
-
-                log.dump({
-                    input,
-                    hash,
-                    offset,
-                    hashes,
-
-                    nodes: [],
-                    edges: []
-                }, 3)
             }
             catch (e) {
 

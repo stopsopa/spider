@@ -1,16 +1,64 @@
+/**
+ * Using fetch in this case was abandoned because request:
 
-const https         = require('https');
+ fetch('/router?timeout=2000&url=' + encodeURIComponent('http://x.x.x.x:1035/../en/contact'))
+     .then(res => res.json())
+     .then(json => console.log(JSON.stringify(json, null, 4)))
+ ;
+ * returned:
+ * {
+        "foundlinks": [
+            "/en/lofts",
+            "/en/extensions",
+            "/en/refurbishments",
+            "/en/new-builds",
+            "/en/decorations",
+            "/../en/contact"
+        ],
+        "status": 200,
+        "headers": {
+            "cache-control": "no-cache, no-store, must-revalidate",
+            "connection": "close",
+            "content-encoding": "gzip",
+            "content-type": "text/html; charset=utf-8",
+            "date": "Sat, 27 Jul 2019 18:15:23 GMT",
+            "transfer-encoding": "chunked",
+            "vary": "Accept-Encoding"
+        },
+        "isHtml": true,
+        "redirected": [
+            [
+                302,
+                "http://x.x.x.x:1035/../en/contact"
+            ],
+            [
+                200,
+                "http://x.x.x.x:1035/en"
+            ]
+        ]
+    }
+ where it should return:
+ {
+    "foundlinks": [],
+    "status": 200,
+    "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "content-length": "5586",
+        "vary": "Accept-Encoding",
+        "cache-control": "no-cache, no-store, must-revalidate",
+        "date": "Sat, 27 Jul 2019 18:17:23 GMT",
+        "connection": "close"
+    },
+    "isHtml": true
+}
+ * @type {{FetchError?, Headers?: Headers, Response?: Response, Request?: Request}|fetch}
+ */
 
-const http          = require('http');
 
-const path          = require('path');
-
-const querystring   = require('querystring');
-
-const URL           = require('url').URL;
+const fetch = require('node-fetch');
 
 // https://github.com/bitinn/node-fetch#request-cancellation-with-abortsignal
-// const AbortController = require('abort-controller');
+const AbortController = require('abort-controller');
 
 const log       = require('inspc');
 
@@ -20,105 +68,7 @@ const { wait } = require('nlab/delay');
 
 var reg = /<a\s+[^>]*?href\s*=\s*(['"])([^\1]*?)\1[^>]*?>/gi;
 
-function request (url, timeout = 30000) {
-
-    return new Promise((resolve, reject) => {
-
-        log.t(`attempt to fetch: '${url}'`);
-
-        const uri   = new URL(url);
-
-        const lib   = (uri.protocol.indexOf('https://') === 0) ? https : http;
-
-        const get = {};
-
-        const query = querystring.stringify(get)
-
-        // log.dump({
-        //     url,
-        //     hostname    : uri.hostname,
-        //     port        : uri.port || '80',
-        //     path        : uri.pathname + uri.search + (query ? (uri.search.includes('?') ? '&' : '?') + query : ''),
-        //     // method      : 'POST',
-        //     headers     : {
-        //         // 'Content-Type': 'application/json; charset=utf-8',
-        //         Accept: `text/html; charset=utf-8`,
-        //     },
-        // })
-
-        var req = lib.request({
-            hostname    : uri.hostname,
-            port        : uri.port || '80',
-            path        : uri.pathname + uri.search + (query ? (uri.search.includes('?') ? '&' : '?') + query : ''),
-            // method      : 'POST',
-            headers     : {
-                // 'Content-Type': 'application/json; charset=utf-8',
-                Accept: `text/html; charset=utf-8`,
-            },
-        }, res => {
-
-            const isHtml = (res.headers['content-type'] || '').toLowerCase().indexOf('text/html') === 0;
-
-            if (isHtml) {
-
-                res.setEncoding('utf8');
-
-                let body = '';
-
-                res.on('data', chunk => {
-
-                    body += chunk
-                });
-
-                res.on('end', () => {
-
-                    resolve({
-                        status: res.statusCode,
-                        headers: res.headers,
-                        body,
-                        isHtml,
-                        uri,
-                    })
-                });
-            }
-            else {
-
-                resolve({
-                    status: res.statusCode,
-                    headers: res.headers,
-                    isHtml,
-                    uri,
-                })
-            }
-        });
-
-        req.on('socket', function (socket) { // uncomment this to have timeout
-
-            socket.setTimeout(timeout);
-
-            socket.on('timeout', () => { // https://stackoverflow.com/a/9910413/5560682
-
-                req.abort();
-
-                reject({
-                    type: 'timeout',
-                })
-            });
-        });
-
-        req.on('error', e => reject({
-            type: 'error',
-            error: e,
-        }));
-
-        // req.write(JSON.stringify({
-        //     data: 'sent'
-        // }, null, 4));
-
-        req.end();
-    });
-}
-
+const URL           = require('url').URL;
 
 function isInTheSameOrigin(url1, url2) {
 
@@ -157,9 +107,9 @@ function extractLinks(originalurl, html) {
 
     var h, links = [];
 
-    var pathname = location.pathname.split('/');
-    pathname.pop();
-    pathname = pathname.join('/');
+    var path = location.pathname.split('/');
+    path.pop();
+    path = path.join('/');
 
     var noorigin = location.href.substring(location.origin.length)
     var nooriginwithouthash = noorigin;
@@ -245,14 +195,12 @@ function extractLinks(originalurl, html) {
         }
 
         if ( ! /^https?:\/\//i.test(h) && h[0] !== '/' ) {
-            links.push(pathname + '/' + h);
+            links.push(path + '/' + h);
         }
     }
 
     // unique
     links = links.reduce((acc, link) => {
-
-        link = path.normalize(link);
 
         acc[link] = link;
 
@@ -293,34 +241,71 @@ const fetchLib = async (opt = {}) => {
         throw Err(`Url should start from http or https, it is: '${url}'`);
     }
 
+    const controller = new AbortController();
+
+    const handler = setTimeout(
+        () => controller.abort(),
+        timeout,
+    );
+
     const json = {
         foundlinks: [],
     }
 
-    const data      = await request(url, timeout);
+    let fres;
 
-    const status    = data.status;
+    try {
 
-    json.status     = status;
+        log.t(`attempt to fetch: '${url}'`);
 
-    json.headers    = data.headers;
+        fres = await fetch(url, {
+            signal      : controller.signal,
+            redirect    : 'manual',
+            headers: {
+                Accept: `text/html`
+            }
+        });
+    }
+    catch (e) {
 
-    json.isHtml     = data.isHtml;
+        clearTimeout(handler);
+
+        throw e;
+    }
+
+    const status = fres.status;
+
+    json.status = status;
+
+    json.headers = (function () {
+        try {
+
+            const h = {}
+
+            fres.headers.forEach((value, key) => h[key + ''] = value + '');
+
+            return h;
+        }
+        catch (e) {
+
+            return {}
+        }
+    })();
 
     if (status === 301 || status === 302) {
 
-        let redloc = json.headers.location + '';
+        log.dump({
+            url,
+            status,
+            'json.headers' : json.headers,
+            headers: fres.headers,
+        })
+
+        const redloc = json.headers.location + '';
 
         if ( typeof redloc !== 'string' ) {
 
             throw Err(`redloc is not defined`);
-        }
-
-        if ( ! /^https?:\/\//i.test(redloc) ) {
-
-            const t = data.uri;
-
-            redloc = t.protocol + '//' + t.host + redloc;
         }
 
         // if ( ! isInTheSameOrigin(redloc, url) ) {
@@ -344,10 +329,15 @@ const fetchLib = async (opt = {}) => {
 
         opt.url = redloc;
 
+        clearTimeout(handler);
+
         return await fetchLib(opt);
     }
 
-    const htmltmp = data.body;
+    // content-type: "text/html; charset=utf-8"
+    json.isHtml = (json.headers['content-type'] || '').toLowerCase().indexOf('text/html') === 0;
+
+    const htmltmp = await fres.text();
 
     if (htmltmp) {
 
@@ -365,6 +355,8 @@ const fetchLib = async (opt = {}) => {
 
         json.redirected.push([status, url]);
     }
+
+    clearTimeout(handler);
 
     return json;
 }
