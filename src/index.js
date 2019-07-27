@@ -246,6 +246,7 @@ module.exports = (opt = {}) => {
                             catch (e) {
 
                                 log.dump({
+                                    url,
                                     parsing_error: e
                                 }, 3);
 

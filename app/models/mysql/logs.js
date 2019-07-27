@@ -37,7 +37,7 @@ module.exports = knex => extend(knex, prototype, {
 
         row.run = run;
 
-        let query = `select id from :table: where `;
+        let query = `select id from :table: where run = :run and `;
 
         if (row.node) {
 

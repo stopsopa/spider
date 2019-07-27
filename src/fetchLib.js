@@ -20,11 +20,11 @@ const { wait } = require('nlab/delay');
 
 var reg = /<a\s+[^>]*?href\s*=\s*(['"])([^\1]*?)\1[^>]*?>/gi;
 
-function request (url, timeout = 30000) {
+function request (url, timeout = 30000, internal) {
 
     return new Promise((resolve, reject) => {
 
-        log.t(`attempt to fetch: '${url}'`);
+        internal || log.t(`attempt to fetch: '${url}'`);
 
         const uri   = new URL(url);
 
@@ -271,6 +271,7 @@ const fetchLib = async (opt = {}) => {
         timeout         = 30000,
         html            = false,
         redirections    = 8,
+        redcache        = [],
     } = opt;
 
     if ( typeof timeout === 'string' ) {
@@ -297,7 +298,7 @@ const fetchLib = async (opt = {}) => {
         foundlinks: [],
     }
 
-    const data      = await request(url, timeout);
+    const data      = await request(url, timeout, redcache.length > 0);
 
     const status    = data.status;
 
