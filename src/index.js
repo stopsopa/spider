@@ -19,6 +19,8 @@ const fetchLib          = require('./fetchLib');
 
 const isInTheSameOrigin = fetchLib.isInTheSameOrigin;
 
+const justPathnameAndQuery = fetchLib.justPathnameAndQuery;
+
 const knex              = require('knex-abstract');
 
 const mrun              = knex().model.run;
@@ -191,6 +193,18 @@ module.exports = (opt = {}) => {
                                                 await mlogs.ensureExist(trx, runid, {
                                                     edge    : eid,
                                                 });
+
+                                                batch.push({
+                                                    target: 'e',
+                                                    data: {
+                                                        id: eid,
+                                                        from: prev,
+                                                        to: to,
+                                                        arrows:'to',
+                                                        label: String(one[0]),
+                                                        color:{color:'#d2cb00'}
+                                                    }
+                                                });
                                             }
 
                                             prev = to;
@@ -207,6 +221,7 @@ module.exports = (opt = {}) => {
                                             target: 'n',
                                             data: {
                                                 id: from,
+                                                label: from + ' : ' + justPathnameAndQuery(domain, url),
                                             }
                                         });
 
@@ -232,6 +247,7 @@ module.exports = (opt = {}) => {
                                                     target: 'n',
                                                     data: {
                                                         id: nid,
+                                                        label: nid + ' : ' + justPathnameAndQuery(domain, link),
                                                     }
                                                 });
 
@@ -242,7 +258,8 @@ module.exports = (opt = {}) => {
                                                     data: {
                                                         id: eid,
                                                         from,
-                                                        to: nid
+                                                        to: nid,
+                                                        arrows:'to',
                                                     }
                                                 });
 

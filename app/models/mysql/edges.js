@@ -28,7 +28,7 @@ module.exports = knex => extend(knex, prototype, {
         if ( id ) {
 
             await this.update(debug, trx, {
-                redirection: null,
+                redirection,
             }, id);
 
             return id;
@@ -37,6 +37,7 @@ module.exports = knex => extend(knex, prototype, {
         return await this.insert(debug, trx, {
             from_id : from,
             to_id   : to,
+            redirection,
         });
     },
     fromDb: async function (row, opt, trx) {

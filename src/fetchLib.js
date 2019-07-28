@@ -352,7 +352,7 @@ const fetchLib = async (opt = {}) => {
             opt.redcache = [];
         }
 
-        opt.redcache.push([status, url]);
+        opt.redcache.push([status, redloc]);
 
         opt.url = redloc;
 
@@ -374,13 +374,25 @@ const fetchLib = async (opt = {}) => {
     if ( Array.isArray(opt.redcache) ) {
 
         json.redirected = opt.redcache;
-
-        json.redirected.push([status, url]);
     }
 
     return json;
 }
 
+function justPathnameAndQuery (domain, url) {
+
+    if ( isInTheSameOrigin(domain, url) && /^https?:\/\//i.test(url) ) {
+
+        const t = new URL(url);
+
+        return t.pathname + (t.search || '');
+    }
+
+    return url;
+}
+
 fetchLib.isInTheSameOrigin = isInTheSameOrigin;
+
+fetchLib.justPathnameAndQuery = justPathnameAndQuery;
 
 module.exports = fetchLib;
