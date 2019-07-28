@@ -177,9 +177,12 @@ module.exports = (opt = {}) => {
 
                                             const to    = await mnodes.ensureExist(trx, one[1], extra);
 
-                                            await mlogs.ensureExist(trx, runid, {
-                                                node    : to,
-                                            });
+                                            if (data.redirected.length !== 0) { // don't mark last one
+
+                                                await mlogs.ensureExist(trx, runid, {
+                                                    node    : to,
+                                                });
+                                            }
 
                                             if (prev !== to) {
 

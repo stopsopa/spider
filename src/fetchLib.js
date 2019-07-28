@@ -180,6 +180,9 @@ function extractLinks(originalurl, html) {
         nooriginwithouthash = nooriginwithouthash[0];
     }
 
+    // remove comments
+    html = html.replace(/<!--.*?-->/sg, '');
+
     let list = [];
 
     reg.lastIndex = 0;
