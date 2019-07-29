@@ -200,6 +200,10 @@ function extractLinks(originalurl, html) {
 
     } while (tmp);
 
+    // log.dump({
+    //     list,
+    // }, 5);
+
     list = list.map(u => trim(u)).filter(Boolean);
 
     // http://origin/directory/link
@@ -256,11 +260,22 @@ function extractLinks(originalurl, html) {
         //     links.push(pathname + '/' + h);
         // }
 
-        if ( /^https?:\/\//i.test(h) ) {
+                                if ( /^https?:\/\//i.test(h) ) {
 
-            links.push(h);
-        }
+                                    links.push(h);
+                                    continue;
+                                }
+
+                                if ( h.includes('./') ) {
+
+                                    links.push(path.normalize(path.join('/', h)));
+                                    continue;
+                                }
     }
+
+    // log.dump({
+    //     links,
+    // }, 5);
 
     // unique
     links = links.reduce((acc, link) => {
